@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        #container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 2.5vh;
+            text-align: left;
+            max-width: 90%;
+            line-height: 1.4;
+        }
+        .typing-cursor {
+            display: inline-block;
+            width: 1px;
+            background: white;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        /* Shooting Stars */
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background-color: #fff;
+            border-radius: 50%;
+            animation: moveStar 5s linear infinite;
+        }
+        @keyframes moveStar {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(100vw);
+            }
+        }
+        .star::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            transform: rotate(45deg);
+        }
+        .star::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            transform: rotate(-45deg);
+        }
+        /* Music Player Styles */
+        #musicPlayer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            width: 500px; /* Increased width */
+            color: white;
+            text-align: left;
+        }
+        #albumArt {
+            width: 200px; /* Increased width */
+            height: 200px; /* Increased height */
+            border-radius: 15px;
+            margin-bottom: 15px;
+            background-image: url('about_you_album_art.jpg');
+            background-size: cover;
+            background-position: center;
+            float: left;
+            margin-right: 30px;
+        }
+        #trackInfo {
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        #trackInfo h3 {
+            margin: 0;
+            font-size: 2em; /* Increased font size */
+        }
+        #trackInfo p {
+            margin: 0;
+            font-size: 1.2em; /* Increased font size */
+            color: #aaa;
+        }
+        #controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #controls button {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            width: 50px; /* Increased width */
+            height: 50px; /* Increased height */
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+        #playButton {
+            background-image: url('play_button.png');
+        }
+        #playButton.playing {
+            background-image: url('pause_button.png');
+        }
+        #likeButton {
+            background-image: url('heart_icon.png');
+        }
+        #timeDisplay {
+            font-size: 1em; /* Increased font size */
+            color: #aaa;
+        }
+        /* Hide the music player after playing */
+        #musicPlayer.hidden {
+            display: none;
+        }
+        /* Lyrics Container */
+        #lyricsContainer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 3vh; /* Increased font size */
+            text-align: left;
+            max-width: 90%;
+            line-height: 1.6;
+            display: none; /* Initially hidden */
+        }
+        #lyricsContainer.visible {
+            display: block; /* Make visible when playing */
+        }
+    </style>
+</head>
+<body>
+    <!-- Audio element referencing local file -->
+    <audio id="music" preload="auto">
+        <source src="about-you.mp3" type="audio/mpeg">
+        <source src="about-you.ogg" type="audio/ogg">
+        <p>Your browser does not support HTML5 audio.</p>
+    </audio>
+
+    <!-- Music Player -->
+    <div id="musicPlayer">
+        <div id="albumArt"></div>
+        <div id="trackInfo">
+            <h3>About You</h3>
+            <p>The 1975</p>
+        </div>
+        <div id="controls">
+            <span id="timeDisplay">2:45 / 5:27</span>
+            <div>
+                <button id="playButton"></button>
+                <button id="likeButton"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lyrics Container -->
+    <div id="lyricsContainer"></div>
+
+    <script>
+        const lyrics = [
+            { time: 4.5, text: "And there was something about you that now I can't remember" },
+            { time: 9.5, text: "It's the same damn thing that made my heart surrender" },
+            { time: 14.5, text: "And I'll miss you on a train, I'll miss you in the mornin'" },
+            { time: 20.5, text: "I never know what to think about" },
+            { time: 25.5, text: "I think about you (Don't let go)" },
+            { time: 30.5, text: "About you (i miss u)" }
+        ];
+
+        const musicPlayer = document.getElementById('musicPlayer');
+        const lyricsContainer = document.getElementById('lyricsContainer');
+        const audio = document.getElementById('music');
+        const playButton = document.getElementById('playButton');
+        let isPlaying = false;
+
+        let lineIndex = 0;
+        let charIndex = 0;
+        let isNewLine = true;
+
+        // Function to type character
+        function typeCharacter() {
+            if (lineIndex >= lyrics.length) return;
+
+            if (charIndex === 0 && isNewLine) {
+                lyricsContainer.innerHTML += '<div class="line"></div>';
+                isNewLine = false;
+            }
+
+            const currentLineData = lyrics[lineIndex];
+            const currentLine = currentLineData.text;
+            const lineElement = lyricsContainer.lastElementChild;
+
+            if (charIndex < currentLine.length) {
+                lineElement.innerHTML = currentLine.substring(0, charIndex + 1) + 
+                    '<span class="typing-cursor"></span>';
+                charIndex++;
+                
+                // Adjusted timing logic based on line index
+                let delay;
+                if (lineIndex === 0) {
+                    delay = 55; // Base speed for the first line
+                } else if (lineIndex === 1 || lineIndex === 2) {
+                    delay = 70; // Slower speed for second and third lines
+                } else {
+                    delay = 90; // Even slower speed for subsequent lines
+                }
+                const currentChar = currentLine[charIndex];
+                
+                if (/[.,!?]/.test(currentChar)) delay = 300;
+                if (currentChar === ' ') delay = 80;
+                
+                setTimeout(typeCharacter, delay);
+            } else {
+                lineElement.innerHTML = currentLine;
+                lineIndex++;
+                charIndex = 0;
+                isNewLine = true;
+                
+                // Increased pause between lines to maintain tempo
+                let lineDelay;
+                if (lineIndex <= 3) {
+                    lineDelay = 600; // Pause for earlier lines
+                } else {
+                    lineDelay = 800; // Longer pause for later lines
+                }
+                setTimeout(typeCharacter, lineDelay);
+            }
+        }
+
+        // Function to create shooting stars
+        function createStars() {
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.classList.add('star');
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.left = `${Math.random() * -100}%`;
+                star.style.animationDelay = `${Math.random() * 5}s`;
+                document.body.appendChild(star);
+            }
+        }
+
+        // Event listener for play button
+        playButton.addEventListener('click', () => {
+            if (isPlaying) {
+                audio.pause();
+                playButton.classList.remove('playing');
+            } else {
+                audio.play().then(() => {
+                    playButton.classList.add('playing');
+                    musicPlayer.classList.add('hidden'); // Hide music player
+                    lyricsContainer.classList.add('visible'); // Show lyrics container
+                    
+                    // Create shooting stars effect
+                    createStars();
+                    
+                    // Start lyrics and animation
+                    setTimeout(() => {
+                        typeCharacter();
+                    }, 4500);
+                }).catch(error => {
+                    console.error('Playback failed:', error);
+                    alert('Failed to play music. Please try again.');
+                });
+            }
+            isPlaying = !isPlaying;
+        });
+    </script>
+</body>
+</html>
